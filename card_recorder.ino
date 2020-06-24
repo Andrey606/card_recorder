@@ -8,6 +8,7 @@ uint8_t KEY_OMO_KEYAB[6] = {0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B};
 static const uint8_t KEY_DEFAULT_KEYAB_WRITE[16] = {0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B, 0xFF, 0x07, 0x80, 0x69, 0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B};
 
 void getRandomUserId(void);
+void setUserId(String userId);
 
 uint8_t UserID[48] =  {0}; // 8-4-4-4-12
 uint8_t ndefprefix = NDEF_URIPREFIX_NONE;
@@ -60,9 +61,8 @@ void loop(void) {
   // if the uid is 4 bytes (Mifare Classic) or 7 bytes (Mifare Ultralight)
   success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
 
-  // generating new random user id
-  // UserID[48] =  "df1ff3ef-5ddd-4145-8e7d-5585f746c0c8";
-  UserID[48] = "df1ff3ef-5ddd-4145-8e7d-5585f746c0c8";
+
+  setUserId("930c6d7b-ea68-4ddf-9852-1ac7c71c19b1");
   
 
   if (success) {
@@ -138,7 +138,7 @@ void loop(void) {
         }
         else
         {
-          getRandomUserId();
+          //getRandomUserId();
           
           if(currentblock == 4)
           {
@@ -256,4 +256,17 @@ void getRandomUserId(void)
   UserID[13] = '-';
   UserID[18] = '-';
   UserID[23] = '-';
+}
+
+void setUserId(String userId)
+{
+  for(int i=0; i<48; i++)
+  {
+    UserID[i] = 0;
+  }
+  
+  for(int i=0; i<36; i++)
+  {
+    UserID[i] = userId[i];
+  }
 }
