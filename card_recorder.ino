@@ -2,8 +2,9 @@
 #include <Adafruit_PN532.h>
 
 // The default Mifare Classic key
-static const uint8_t KEY_DEFAULT_KEYAB[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-//static const uint8_t KEY_DEFAULT_KEYAB[6] = {0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B};
+
+uint8_t KEY_DEFAULT_KEYAB[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+uint8_t KEY_OMO_KEYAB[6] = {0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B};
 static const uint8_t KEY_DEFAULT_KEYAB_WRITE[16] = {0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B, 0xFF, 0x07, 0x80, 0x69, 0x21, 0x48, 0x55, 0x49, 0x3B, 0x2B};
 
 void getRandomUserId(void);
@@ -20,6 +21,9 @@ uint8_t ndefprefix = NDEF_URIPREFIX_NONE;
 Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
 
 void setup(void) {
+  pinMode(13, OUTPUT);
+  pinMode(12, OUTPUT);
+  
   // has to be fast to dump the entire memory contents!
   Serial.begin(115200);
   Serial.println("Looking for PN532...");
@@ -50,10 +54,6 @@ void loop(void) {
   uint8_t currentblock;                     // Counter to keep track of which block we're on
   bool authenticated = false;               // Flag to indicate if the sector is authenticated
   uint8_t data[16];                         // Array to store block data during reads
-
-  // Keyb on NDEF and Mifare Classic should be the same
-  uint8_t keyuniversal[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-  
 
   // Wait for an ISO14443A type cards (Mifare, etc.).  When one is found
   // 'uid' will be populated with the UID, and uidLength will indicate
@@ -88,34 +88,52 @@ void loop(void) {
         // If the sector hasn't been authenticated, do so first
         if (!authenticated)
         {
-          // Starting of a new sector ... try to to authenticate
-          Serial.print("------------------------Sector ");Serial.print(currentblock/4, DEC);Serial.println("-------------------------");
-          if (currentblock == 0)
-          {
-              // This will be 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF for Mifare Classic (non-NDEF!)
-              // or 0xA0 0xA1 0xA2 0xA3 0xA4 0xA5 for NDEF formatted cards using key a,
-              // but keyb should be the same for both (0xFF 0xFF 0xFF 0xFF 0xFF 0xFF)
-              success = nfc.mifareclassic_AuthenticateBlock (uid, uidLength, currentblock, 1, KEY_DEFAULT_KEYAB);
-          }
-          else
-          {
-              // This will be 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF for Mifare Classic (non-NDEF!)
-              // or 0xD3 0xF7 0xD3 0xF7 0xD3 0xF7 for NDEF formatted cards using key a,
-              // but keyb should be the same for both (0xFF 0xFF 0xFF 0xFF 0xFF 0xFF)
-              success = nfc.mifareclassic_AuthenticateBlock (uid, uidLength, currentblock, 1, KEY_DEFAULT_KEYAB);
-          }
-          if (success)
-          {
-            authenticated = true;
-          }
-          else
-          {
-            Serial.println("Authentication error");
-          }
+
+            // Starting of a new sector ... try to to authenticate
+            Serial.print("------------------------Sector ");Serial.print(currentblock/4, DEC);Serial.println("-------------------------");
+            if (currentblock == 0)
+            {
+                // This will be 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF for Mifare Classic (non-NDEF!)
+                // or 0xA0 0xA1 0xA2 0xA3 0xA4 0xA5 for NDEF formatted cards using key a,
+                // but keyb should be the same for both (0xFF 0xFF 0xFF 0xFF 0xFF 0xFF)
+                success = nfc.mifareclassic_AuthenticateBlock (uid, uidLength, currentblock, 1, KEY_DEFAULT_KEYAB);
+
+                if(!success)
+                {
+                  nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
+                  success = nfc.mifareclassic_AuthenticateBlock (uid, uidLength, currentblock, 1, KEY_OMO_KEYAB);
+                }
+            }
+            else
+            {
+                // This will be 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF for Mifare Classic (non-NDEF!)
+                // or 0xD3 0xF7 0xD3 0xF7 0xD3 0xF7 for NDEF formatted cards using key a,
+                // but keyb should be the same for both (0xFF 0xFF 0xFF 0xFF 0xFF 0xFF)
+                success = nfc.mifareclassic_AuthenticateBlock (uid, uidLength, currentblock, 1, KEY_DEFAULT_KEYAB);
+
+                if(!success)
+                {
+                  nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
+                  success = nfc.mifareclassic_AuthenticateBlock (uid, uidLength, currentblock, 1, KEY_OMO_KEYAB);
+                }
+            }
+            
+            if (success)
+            {
+              authenticated = true;              
+            }
+            else
+            {
+                
+              Serial.println("Authentication error");
+            }
+          
         }
+        
         // If we're still not authenticated just skip the block
         if (!authenticated)
         {
+          // если не подходит пароль
           Serial.print("Block ");Serial.print(currentblock, DEC);Serial.println(" unable to authenticate");
         }
         else
@@ -141,11 +159,17 @@ void loop(void) {
 
           if (success)
           {
+            // прошивка кард айди прошла успешно
             //Serial.println("NDEF URI Record written to sector 1");
+
+            
           }
           else
           {
+          
             Serial.println("NDEF Record creation failed! :(");
+
+            
           }
 
           // Authenticated ... we should be able to read the block now
@@ -166,12 +190,34 @@ void loop(void) {
             }
             // Dump the raw data
             nfc.PrintHexChar(data, 16);
+
+            if(currentblock == 7)
+            {
+              for(int i=0; i<4;i++)
+              {
+                digitalWrite(12, HIGH); 
+                delay(100);
+                digitalWrite(12, LOW); 
+                delay(100);
+              }
+            }
           }
           else
           {
             // Oops ... something happened
             Serial.print("Block ");Serial.print(currentblock, DEC);
             Serial.println(" unable to read this block");
+
+            if(currentblock == 7)
+            {
+              for(int i=0; i<4;i++)
+              {
+                digitalWrite(13, HIGH); 
+                delay(100);
+                digitalWrite(13, LOW); 
+                delay(100);
+              }
+            }
           }
         }        
       }
@@ -183,12 +229,12 @@ void loop(void) {
   }
   // Wait a bit before trying again
   Serial.println("\n\nSend a character to run the mem dumper again!");
-  Serial.flush();
-  while (!Serial.available());
-  while (Serial.available()) {
+  //Serial.flush();
+  //while (!Serial.available());
+  /*while (Serial.available()) {
   Serial.read();
-  }
-  Serial.flush();
+  }*/
+  //Serial.flush();
 }
 
 // "df1ff3ef-5ddd-4145-8e7d-5585f746c0c8"; // 8-4-4-4-12
