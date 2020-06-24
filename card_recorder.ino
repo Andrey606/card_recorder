@@ -62,7 +62,7 @@ void loop(void) {
   success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
 
 
-  setUserId("930c6d7b-ea68-4ddf-9852-1ac7c71c19b1");
+  //setUserId("930c6d7b-ea68-4ddf-9852-1ac7c71c19b1");
   
 
   if (success) {
@@ -138,7 +138,7 @@ void loop(void) {
         }
         else
         {
-          //getRandomUserId();
+          getRandomUserId();
           
           if(currentblock == 4)
           {
